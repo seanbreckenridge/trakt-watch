@@ -82,22 +82,20 @@ Ep[I]sode - Show w/ Season/Episode num
 What type of media do you want to search for?
 Search for show: barry
 Results:
-1: Show:	Barry (2018) | shows/122709
-2: Show:	Carrie and Barry (2004) | shows/9085
-3: Show:	Red Barry (1938) | shows/128828
-4: Show:	Barry Hilton (1999) | shows/110779
-5: Show:	Carrie & Barrie (2004) | shows/128392
-6: Show:	Barry Tales (2013) | shows/100038
-7: Show:	Todd Barry (2012) | shows/105417
-8: Show:	Barry Manilow Specials (1977) | shows/67327
-9: Show:	Barry Welsh is Coming (1996) | shows/13243
-10: Show:	Britain's Greatest Machines With Chris Barrie (2009) | shows/49775
-11: Show:	Deception With Keith Barry (2010) | shows/63137
-Pick result - enter 1-11, or q to quit [1]:
+1: Show:	'Barry (2018)' | shows/122709
+2: Show:	'Carrie and Barry (2004)' | shows/9085
+3: Show:	'Red Barry (1938)' | shows/128828
+4: Show:	'Barry Hilton (1999)' | shows/110779
+5: Show:	'Carrie & Barrie (2004)' | shows/128392
+6: Show:	'Barry Tales (2013)' | shows/100038
+7: Show:	'Todd Barry (2012)' | shows/105417
+8: Show:	'Barry Manilow Specials (1977)' | shows/67327
+9: Show:	'Barry Welsh is Coming (1996)' | shows/13243
+10: Show:	'Britains Greatest Machines With Chris Barrie (2009)' | shows/49775
+11: Show:	'Deception With Keith Barry (2010)' | shows/63137
+'Pick result - enter 1-11, or q to quit [1]':
 Season: 1
 Episode: 8
-Added:
-Episodes: 1
 ```
 
 ### Tests
