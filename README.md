@@ -9,8 +9,6 @@ A small CLI to mark items watched on trakt. This lets you:
 
 This uses [traktexport](https://github.com/seanbreckenridge/traktexport) internally to authenticate, so follow the steps [here](https://github.com/seanbreckenridge/traktexport#auth) to login/setup your credentials.
 
-After which you can use 
-
 ## Installation
 
 Requires `python3.11+`
@@ -23,7 +21,7 @@ pip install git+https://github.com/seanbreckenridge/trakt-watch
 
 ## Usage
 
-You can set the `TRAKT_USERNAME` environment variable so you don't have to pass it every time. 
+You can set the `TRAKT_USERNAME` environment variable so you don't have to pass it every time.
 
 ```
 Usage: trakt-watch [OPTIONS] COMMAND [ARGS]...
@@ -74,14 +72,14 @@ Recent history:
 Search for an TV show and provide a season/episode number:
 
 ```bash
-$ trakt-watch watch 
+$ trakt-watch watch
 [M]ovie
 [S]how
 [E]pisode name
 Ep[I]sode - Show w/ Season/Episode num
 [U]rl
 [A]ll
-What type of media do you want to search for? 
+What type of media do you want to search for?
 Search for show: barry
 Results:
 1: Show:	Barry (2018) | shows/122709
@@ -95,7 +93,7 @@ Results:
 9: Show:	Barry Welsh is Coming (1996) | shows/13243
 10: Show:	Britain's Greatest Machines With Chris Barrie (2009) | shows/49775
 11: Show:	Deception With Keith Barry (2010) | shows/63137
-Pick result - enter 1-11, or q to quit [1]: 
+Pick result - enter 1-11, or q to quit [1]:
 Season: 1
 Episode: 8
 Added:

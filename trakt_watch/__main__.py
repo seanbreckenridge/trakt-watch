@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# TODO:
-# - allow setting limit for unwatch, or an offset?
-
 import json
 from typing import (
     get_args,
