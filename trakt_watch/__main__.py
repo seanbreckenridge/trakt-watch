@@ -255,11 +255,11 @@ def _search_trakt() -> Input:
             fg="red",
             err=True,
         )
-    # 'movie', 'show', 'episode', or 'person'
-    pressed = pressed if pressed in allowed else "A"
     if pressed == "U":
         urlp = click.prompt("Url", type=str)
-        inp = _parse_url_to_input(urlp)
+        return _parse_url_to_input(urlp)
+    # 'movie', 'show', 'episode', or 'person'
+    pressed = pressed if pressed in allowed else "A"
     media_type: Optional[str] = {
         "M": "movie",
         "S": "show",
@@ -295,7 +295,7 @@ def _search_trakt() -> Input:
 
     result = results[choice - 1]
     result._get()
-    inp: Input = _parse_url_to_input(f"https://trakt.tv/{result.ext}")
+    inp = _parse_url_to_input(f"https://trakt.tv/{result.ext}")
     if pressed == "I":
         season = click.prompt("Season", type=int)
         episode = click.prompt("Episode", type=int)
