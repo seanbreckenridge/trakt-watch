@@ -16,7 +16,7 @@ Requires `python3.11+`
 To install with pip, run:
 
 ```
-pip install git+https://github.com/seanbreckenridge/trakt-watch
+pip install trakt-watch
 ```
 
 ## Usage
@@ -37,9 +37,24 @@ Commands:
   watch    mark movie/episode as watched
 ```
 
+To watch entries, you can provide a URL, or search for a movie/TV show/episode. By default, will use now as the watched time:
+
+```
+Usage: trakt-watch watch [OPTIONS]
+
+  Mark an entry on trakt.tv as watched
+
+Options:
+  --url URL                   URL to watch
+  -a, --at DATE               Watched at time (date like string, or 'released')
+  -r, --rating INTEGER RANGE  Rating  [1<=x<=10]
+  -l, --letterboxd            open corresponding letterboxd.com entry in your browser
+  -h, --help                  Show this message and exit.
+```
+
 Query recent history:
 
-```bash
+```
 $ trakt-watch recent
 2023-10-21 22:24:59 Stuff Made Here S2023E1 - I sent robot forgeries to a handwriting expert
 2023-10-21 22:18:10 Possession
@@ -55,7 +70,7 @@ $ trakt-watch recent
 
 Set a movie as watched/rate it:
 
-```bash
+```
 $ trakt-watch watch --at '10m ago' --url https://trakt.tv/movies/possession-1981
 Added count:
 Movies: 1
@@ -71,7 +86,7 @@ Recent history:
 
 Search for an TV show and provide a season/episode number:
 
-```bash
+```
 $ trakt-watch watch
 [M]ovie
 [S]how

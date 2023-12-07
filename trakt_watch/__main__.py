@@ -27,7 +27,9 @@ _check_config()
 USERNAME: Optional[str] = None
 
 
-@click.group()
+@click.group(
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 120}
+)
 @click.option(
     "-u",
     "--username",
@@ -151,12 +153,15 @@ def _parse_url_to_input(url: str) -> Input:
             raise ValueError(f"Invalid URL parts: {prts}")
 
 
+TraktType = Union[Movie, TVEpisode, TVShow]
+
+
 def _mark_watched(
     input: Input,
     *,
     watched_at: Union[datetime, None, Literal["released"]] = None,
     rating: Optional[int] = None,
-) -> None:
+) -> TraktType:
     if isinstance(input, MovieId):
         mv = input.trakt()
         _print_response(mv.mark_as_seen(watched_at=watched_at))
@@ -165,13 +170,17 @@ def _mark_watched(
                 rating = click.prompt("Rating", type=int)
             assert isinstance(rating, int)
             _print_response(mv.rate(rating), rating=True)
+        return mv
     elif isinstance(input, EpisodeId):
         ep = input.trakt()
         _print_response(ep.mark_as_seen(watched_at=watched_at))
+        return ep
     elif isinstance(input, TVShowId):
         # prompt user if they want to watch an entire show or just an episode
+        tv = input.trakt()
         if click.confirm("Really mark entire show as watched?", default=False):
-            _print_response(input.trakt().mark_as_seen(watched_at=watched_at))
+            _print_response(tv.mark_as_seen(watched_at=watched_at))
+        return tv
     else:
         raise ValueError(f"Invalid input type: {type(input)}")
 
@@ -201,30 +210,43 @@ def _parse_datetime(
         return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
-def _display_search_entry(entry: Any, *, include_slug: bool = False) -> str:
+def _display_search_entry(entry: Any, *, print_url: bool = False) -> str:
     buf: str = ""
     if isinstance(entry, Movie):
         buf += f"Movie:\t{entry.title} ({entry.year})"
+        if print_url and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
+            buf += f" | https://trakt.tv/movies/{entry.ids['ids']['slug']}"
+        elif print_url and entry.ext:
+            buf += f" | https://trakt.tv/{entry.ext}"
     elif isinstance(entry, TVEpisode):
         buf += f"Episode:\t{entry.show} S{entry.season}E{entry.episode} - {entry.title}"
+        if print_url and entry.ext:
+            buf += f" | https://trakt.tv/{entry.ext}"
     elif isinstance(entry, TVShow):
         buf += f"Show:\t{entry.title} ({entry.year})"
+        if print_url and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
+            buf += f" | https://trakt.tv/shows/{entry.ids['ids']['slug']}"
+        elif print_url and entry.ext:
+            buf += f" | https://trakt.tv/{entry.ext}"
     elif isinstance(entry, Person):
         buf += f"Person:\t{entry.name}"
+        if print_url and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
+            buf += f" | https://trakt.tv/people/{entry.ids['ids']['slug']}"
+        elif print_url and entry.ext:
+            buf += f" | https://trakt.tv/{entry.ext}"
     else:
         raise ValueError(f"Invalid entry type: {type(entry)}")
-
-    if include_slug:
-        buf += f" | {entry.ext}"
 
     return buf
 
 
 def _handle_pick_result(
     user_input: str,
-) -> Optional[int]:
+) -> Union[int, Literal["u"], None]:
     if user_input.strip() in {"n", "q"}:
         raise click.Abort()
+    if user_input.strip() == "u":
+        return "u"
     try:
         choice = int(user_input)
         return choice
@@ -246,13 +268,14 @@ def _search_trakt() -> Input:
     )
     pressed = click.getchar().upper()
     click.echo()
-    if pressed not in allowed:
+    if pressed.strip() == "":
+        click.secho("No input", fg="red")
+    elif pressed not in allowed:
         click.secho(
-            f"Invalid choice: {pressed}, should be one of ({', '.join(allowed)})",
+            f"'{pressed}', should be one of ({', '.join(allowed)})",
             fg="red",
-            err=True,
         )
-    if pressed == "U":
+    elif pressed == "U":
         urlp = click.prompt("Url", type=str)
         return _parse_url_to_input(urlp)
     # 'movie', 'show', 'episode', or 'person'
@@ -273,17 +296,22 @@ def _search_trakt() -> Input:
 
     choice: Optional[int] = None
 
+    print_urls = False
     while choice is None:
         click.echo("Results:")
         for i, result in enumerate(results, 1):
-            click.echo(f"{i}: {_display_search_entry(result, include_slug=True)}")
+            click.echo(f"{i}: {_display_search_entry(result, print_url=print_urls)}")
 
         choice = click.prompt(
-            f"Pick result - enter 1-{len(results)}, or q to quit",
+            f"Pick result - enter 1-{len(results)}, or q to quit, u to show URLs",
             default="1",
             value_proc=_handle_pick_result,
         )
         if choice is None:
+            continue
+        if choice == "u":
+            print_urls = not print_urls
+            choice = None
             continue
         assert isinstance(choice, int), f"Invalid choice type: {choice} {type(choice)}"
         if choice < 1 or choice > len(results):
@@ -309,11 +337,22 @@ def _handle_input(
         return _search_trakt()
 
 
+def _open_letterboxd(media: TraktType) -> None:
+    from webbrowser import open_new_tab
+
+    if media.ids.get("ids") and media.ids["ids"].get("tmdb"):
+        url = f"https://letterboxd.com/tmdb/{media.ids['ids']['tmdb']}/"
+        open_new_tab(url)
+    else:
+        click.secho("Cannot determine Letterboxd URL for entry", fg="red", err=True)
+
+
 @main.command(short_help="mark movie/episode as watched")
 @click.option(
     "--url",
     "inp",
     help="URL to watch",
+    metavar="URL",
     required=False,
     default=None,
     type=click.UNPROCESSED,
@@ -322,6 +361,7 @@ def _handle_input(
 @click.option(
     "-a",
     "--at",
+    metavar="DATE",
     help="Watched at time (date like string, or 'released')",
     callback=_parse_datetime,
     default=None,
@@ -333,13 +373,27 @@ def _handle_input(
     type=click.IntRange(min=1, max=10),
     default=None,
 )
+@click.option(
+    "-l",
+    "--letterboxd",
+    "letterboxd",
+    help="open corresponding letterboxd.com entry in your browser",
+    is_flag=True,
+    default=False,
+    envvar="OPEN_LETTERBOXD",
+)
 def watch(
-    inp: Input, at: Union[datetime, Literal["released"], None], rating: Optional[int]
+    inp: Input,
+    at: Union[datetime, Literal["released"], None],
+    rating: Optional[int],
+    letterboxd: bool,
 ) -> None:
     """
-    Pass the movie/episode url to mark it as watched right now
+    Mark an entry on trakt.tv as watched
     """
-    _mark_watched(inp, watched_at=at, rating=rating)
+    media = _mark_watched(inp, watched_at=at, rating=rating)
+    if letterboxd:
+        _open_letterboxd(media)
     _print_recent_history(_recent_history_entries(limit=10))
 
 
@@ -367,17 +421,23 @@ def _recent_history_entries(
     yield from _parse_history(data)
 
 
-def _display_history_entry(entry: HistoryEntry, include_id: bool = False) -> str:
+def _display_history_entry(
+    entry: HistoryEntry, include_id: bool = False, print_url: bool = False
+) -> str:
     from traktexport.dal import Movie, Episode
 
     watched_at = entry.watched_at.astimezone().strftime("%Y-%m-%d %H:%M:%S")
     buf: str
     if isinstance(entry.media_data, Movie):
         buf = f"{watched_at} {entry.media_data.title}"
+        if print_url and entry.media_data.ids.trakt_slug:
+            buf += f" | https://trakt.tv/movies/{entry.media_data.ids.trakt_slug}"
     elif isinstance(entry.media_data, Episode):
         ep = entry.media_data
         assert isinstance(ep, Episode)
         buf = f"{watched_at} {ep.show.title} S{ep.season}E{ep.episode} - {ep.title}"
+        if print_url and ep.show.ids.trakt_slug:
+            buf += f" | https://trakt.tv/shows/{ep.show.ids.trakt_slug}/seasons/{ep.season}/episodes/{ep.episode}"
     else:
         raise ValueError(f"Invalid media_type: {entry.media_type}")
 
@@ -387,12 +447,14 @@ def _display_history_entry(entry: HistoryEntry, include_id: bool = False) -> str
 
 
 def _print_recent_history(
-    history: Iterable[HistoryEntry], include_id: bool = False
+    history: Iterable[HistoryEntry], include_id: bool = False, print_url: bool = False
 ) -> None:
     history = list(history)  # consume so the request happens
     click.secho("Recent history:", bold=True)
     for i, entry in enumerate(history, 1):
-        click.echo(f"{i}: {_display_history_entry(entry, include_id=include_id)}")
+        click.echo(
+            f"{i}: {_display_history_entry(entry, include_id=include_id, print_url=print_url)}"
+        )
 
 
 @main.command(short_help="remove recent watched item")
@@ -407,26 +469,33 @@ def unwatch(interactive: bool, yes: bool, limit: int) -> None:
 
     data = list(_recent_history_entries(limit=limit))
     picked: HistoryEntry = data[0]
+    print_urls = False
     if interactive:
-        picked_int: Optional[int] = None
-        _print_recent_history(data, include_id=True)
-        while picked_int is None:
-            picked_int = click.prompt(
-                "Pick item to remove, q to quit",
+        choice: Optional[int] = None
+        while choice is None:
+            _print_recent_history(data, include_id=True, print_url=print_urls)
+            choice = click.prompt(
+                "Pick item to remove, q to quit, u to show URLs",
                 default="1",
                 value_proc=_handle_pick_result,
             )
-            if picked_int is None:
+            if choice is None:
                 continue
-            if picked_int < 1 or picked_int > len(data):
-                picked_int = None
+            if choice == "u":
+                print_urls = not print_urls
+                choice = None
+                continue
+            if choice < 1 or choice > len(data):
+                choice = None
                 click.secho(
                     f"Invalid choice, must be 1-{len(data)}", fg="red", err=True
                 )
 
-        picked = data[picked_int - 1]
+        picked = data[choice - 1]
 
-    click.echo(f"Removing {_display_history_entry(picked, include_id=True)}...")
+    click.echo(
+        f"Removing {_display_history_entry(picked, include_id=True, print_url=print_urls)}..."
+    )
 
     last_history_id = picked.history_id
     if not yes:
@@ -451,28 +520,33 @@ def unwatch(interactive: bool, yes: bool, limit: int) -> None:
     "-t",
     "--type",
     "history_type",
+    help="type of items to print",
     type=click.Choice(list(get_args(HistoryType)), case_sensitive=False),
 )
+@click.option("-u", "--urls", is_flag=True, default=False, help="print URLs for items")
 @click.argument("limit", type=int, default=10)
-def recent(limit: int, history_type: Optional[HistoryType]) -> None:
+def recent(limit: int, urls: bool, history_type: Optional[HistoryType]) -> None:
     """
     Show recent history
     """
     _print_recent_history(
-        _recent_history_entries(limit=limit, history_type=history_type)
+        _recent_history_entries(limit=limit, history_type=history_type), print_url=urls
     )
 
 
-def _rate_input(input: Input, rating: int) -> None:
+def _rate_input(input: Input, rating: int) -> TraktType:
     if isinstance(input, MovieId):
         mv = input.trakt()
         _print_response(mv.rate(rating), rating=True)
+        return mv
     elif isinstance(input, EpisodeId):
         ep = input.trakt()
         _print_response(ep.rate(rating), rating=True)
+        return ep
     elif isinstance(input, TVShowId):
         tv = input.trakt()
         _print_response(tv.rate(rating), rating=True)
+        return tv
     else:
         raise ValueError(f"Invalid input type: {type(input)}")
 
@@ -494,11 +568,22 @@ def _rate_input(input: Input, rating: int) -> None:
     required=True,
     prompt=True,
 )
-def rate(inp: Input, rating: int) -> None:
+@click.option(
+    "-l",
+    "--letterboxd",
+    "letterboxd",
+    help="open corresponding letterboxd.com entry in your browser",
+    is_flag=True,
+    default=False,
+    envvar="OPEN_LETTERBOXD",
+)
+def rate(inp: Input, rating: int, letterboxd: bool) -> None:
     """
-    Pass the movie/TV show/episode url to rate it
+    Rate an entry on trakt.tv
     """
-    _rate_input(inp, rating)
+    media = _rate_input(inp, rating)
+    if letterboxd:
+        _open_letterboxd(media)
 
 
 if __name__ == "__main__":
