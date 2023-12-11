@@ -2,9 +2,9 @@
 
 A small CLI to mark items watched on trakt. This lets you:
 
-- Mark movies/episodes as watched
+- Mark movies/episodes as watched (by searching, providing the URL, or choosing a recent TV show to mark the next episode as watched)
 - Rate movies/episodes
-- Remove items from your history
+- Remove recently watched items from your history
 - Query your recent history
 
 This uses [traktexport](https://github.com/seanbreckenridge/traktexport) internally to authenticate, so follow the steps [here](https://github.com/seanbreckenridge/traktexport#auth) to login/setup your credentials.

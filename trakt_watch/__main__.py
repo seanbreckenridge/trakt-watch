@@ -586,7 +586,7 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
     )
 
     if not data:
-        click.secho("Didnt find any progress", fg="red", err=True)
+        click.secho("Didn't find any progress", fg="red", err=True)
         return
 
     from traktexport.dal import Episode, Show
@@ -649,7 +649,7 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
         )
         return
 
-    # get data from next_data and propmt the user to confirm
+    # get data from next_data and prompt the user to confirm
     assert "next_episode" in next_data, f"Invalid next_data: {next_data}"
     next_ep = next_data["next_episode"]
     assert isinstance(next_ep, dict), f"Invalid next_ep: {next_ep}"
