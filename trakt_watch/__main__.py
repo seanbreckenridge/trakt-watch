@@ -340,6 +340,12 @@ def _handle_input(
 def _open_letterboxd(media: TraktType) -> None:
     from webbrowser import open_new_tab
 
+    # dont try to open for people/episodes
+    # entire TV shows are sometimes on letterboxd if they dont have multiple
+    # seasons, and movies obviously are on lb
+    if not isinstance(media, (Movie, TVShow)):
+        return
+
     if media.ids.get("ids") and media.ids["ids"].get("tmdb"):
         url = f"https://letterboxd.com/tmdb/{media.ids['ids']['tmdb']}/"
         open_new_tab(url)
