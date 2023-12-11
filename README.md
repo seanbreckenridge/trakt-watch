@@ -28,13 +28,14 @@ Usage: trakt-watch [OPTIONS] COMMAND [ARGS]...
 
 Options:
   -u, --username TEXT  Trakt username  [env var: TRAKT_USERNAME; required]
-  --help               Show this message and exit.
+  -h, --help           Show this message and exit.
 
 Commands:
-  rate     rate movie/tv show/episode
-  recent   show recent history
-  unwatch  remove recent watched item
-  watch    mark movie/episode as watched
+  progress  mark next episode in progress
+  rate      rate movie/tv show/episode
+  recent    show recent history
+  unwatch   remove recent watched item
+  watch     mark movie/episode as watched
 ```
 
 To watch entries, you can provide a URL, or search for a movie/TV show/episode. By default, will use now as the watched time:
@@ -112,6 +113,8 @@ Results:
 Season: 1
 Episode: 8
 ```
+
+The `progress` command works similarly to `watch`, but it presents you with a list of recently watched episodes, querying trakt for the 'next episode' like on the progress page on the trakt website.
 
 ### Tests
 

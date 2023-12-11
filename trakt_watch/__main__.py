@@ -500,14 +500,15 @@ def unwatch(interactive: bool, yes: bool, limit: int) -> None:
         picked = data[choice - 1]
 
     click.echo(
-        f"Removing {_display_history_entry(picked, include_id=True, print_url=print_urls)}..."
+        f"Removing {_display_history_entry(picked, include_id=True, print_url=print_urls)}...",
+        err=True,
     )
 
     last_history_id = picked.history_id
     if not yes:
         click.confirm("Remove from history?", abort=True, default=True)
 
-    click.echo(f"Removing {last_history_id}...")
+    click.echo(f"Removing {last_history_id}...", err=True)
 
     resp = _trakt_request(
         "sync/history/remove",
@@ -538,6 +539,146 @@ def recent(limit: int, urls: bool, history_type: Optional[HistoryType]) -> None:
     _print_recent_history(
         _recent_history_entries(limit=limit, history_type=history_type), print_url=urls
     )
+
+
+@main.command(short_help="mark next episode in progress")
+@click.option("-u", "--urls", is_flag=True, default=False, help="print URLs for items")
+@click.option("-s", "--specials", is_flag=True, default=False, help="include specials")
+@click.option(
+    "-a",
+    "--at",
+    metavar="DATE",
+    help="Watched at time (date like string, or 'released')",
+    callback=_parse_datetime,
+    default=None,
+)
+def progress(urls: bool, specials: bool, at: datetime) -> None:
+    """
+    Mark next episode in progress as watched
+
+    \b
+    This shows the most recent episode of a show that you have watched,
+    lets you pick one, and then and marks the next episode as watched.
+    """
+    from traktexport.export import _trakt_request
+
+    username = USERNAME
+    assert username is not None
+
+    data = _trakt_request(
+        f"users/{username}/history/episodes?limit=100",
+        logger=None,
+        sleep_time=0,
+    )
+
+    if not data:
+        click.secho("No progress", fg="red", err=True)
+        return
+
+    from traktexport.dal import Episode, Show
+
+    prog: dict[int, HistoryEntry] = {}
+
+    for entry in _parse_history(data):
+        if entry.action != "watch":
+            continue
+        if entry.media_type != "episode":
+            continue
+        assert isinstance(
+            entry.media_data, Episode
+        ), f"Invalid media_data: {entry.media_data}"
+        assert isinstance(
+            entry.media_data.show, Show
+        ), f"Invalid show: {entry.media_data.show}"
+
+        if entry.media_data.show.ids.trakt_id not in prog:
+            prog[entry.media_data.show.ids.trakt_id] = entry
+        else:
+            # if this is newer than the last entry, replace it
+            if entry.watched_at > prog[entry.media_data.show.ids.trakt_id].watched_at:
+                prog[entry.media_data.show.ids.trakt_id] = entry
+
+    if not prog:
+        click.secho("Could not compute any progress", fg="red", err=True)
+        return
+
+    # sort by watched_at
+    prog = dict(sorted(prog.items(), key=lambda x: x[1].watched_at, reverse=True))
+
+    picked: HistoryEntry | None = None
+    print_urls = urls
+    while picked is None:
+        for i, entry in enumerate(prog.values(), 1):
+            click.echo(
+                f"{i}: {_display_history_entry(entry, include_id=True, print_url=print_urls)}"
+            )
+
+        choice = click.prompt(
+            "Pick show, will mark the next episode as watched, q to quit, u to show URLs",
+            default="1",
+            value_proc=_handle_pick_result,
+        )
+
+        if choice is None:
+            continue
+        if choice == "u":
+            print_urls = not print_urls
+            continue
+        if choice < 1 or choice > len(prog):
+            click.secho(f"Invalid choice, must be 1-{len(prog)}", fg="red", err=True)
+            continue
+
+        picked = list(prog.values())[choice - 1]
+
+    assert isinstance(
+        picked.media_data, Episode
+    ), f"Invalid media_data: {picked.media_data}"
+    assert isinstance(
+        picked.media_data.show, Show
+    ), f"Invalid show: {picked.media_data.show}"
+
+    # find next episode using watched progress
+    next_data = _trakt_request(
+        f"shows/{picked.media_data.show.ids.trakt_id}/progress/watched?hidden=true&specials={str(specials).lower()}",
+        logger=None,
+        sleep_time=0,
+    )
+
+    if not next_data:
+        click.secho(
+            f"No progress found for {picked.media_data.show.title}", fg="red", err=True
+        )
+        return
+
+    # get data from next_data and propmt the user to confirm
+    assert 'next_episode' in next_data, f"Invalid next_data: {next_data}"
+    next_ep = next_data['next_episode']
+    assert isinstance(next_ep, dict), f"Invalid next_ep: {next_ep}"
+
+    next_show_slug = picked.media_data.ids.trakt_slug or picked.media_data.show.ids.trakt_slug
+    assert isinstance(next_show_slug, str), f"Invalid next_show_slug: {next_show_slug}"
+    next_episode = next_ep.get("number")
+    assert isinstance(next_episode, int), f"Invalid next_episode: {next_episode}"
+    next_season = next_ep.get("season")
+    assert isinstance(next_season, int), f"Invalid next_season: {next_season}"
+
+    next_episode_title = next_ep.get("title")
+    if next_episode_title is None:
+        next_episode_title = "--"
+
+    next_ep_str = f"{next_episode_title} (S{next_season}E{next_episode})"
+
+    if not click.confirm(
+        f"Mark '{next_ep_str}' from '{picked.media_data.show.title}' as watched?",
+        default=True,
+    ):
+        return
+
+    click.echo(f"Marking {next_ep_str} as watched...", err=True)
+
+    ep = EpisodeId(next_show_slug, next_season, next_episode)
+    _mark_watched(ep, watched_at=at)
+    _print_recent_history(_recent_history_entries(limit=10))
 
 
 def _rate_input(input: Input, rating: int) -> TraktType:
