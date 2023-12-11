@@ -3,7 +3,10 @@
 import json
 from typing import (
     get_args,
+    TypeVar,
+    List,
     Literal,
+    Callable,
     Optional,
     NamedTuple,
     Union,
@@ -257,6 +260,41 @@ def _handle_pick_result(
 
 allowed = ["M", "S", "I", "E", "A", "U"]
 
+T = TypeVar("T")
+
+
+def _pick_item(
+    show_options: Callable[[bool, List[T]], None],
+    /,
+    *,
+    prompt_prefix: str,
+    items: List[T],
+    show_urls_default: bool = False,
+) -> T:
+    choice: Optional[int] = None
+    show_urls = show_urls_default
+    while choice is None:
+        show_options(show_urls, items)
+        choice = click.prompt(
+            f"{prompt_prefix}, enter 1-{len(items)}, q to quit, u to {'hide' if show_urls else 'show'} URLs",
+            default="1",
+            value_proc=_handle_pick_result,
+        )
+        if choice is None:
+            continue
+        if choice == "u":
+            show_urls = not show_urls
+            choice = None
+            continue
+        assert isinstance(
+            choice, int
+        ), f"Invalid choice type: {choice} {type(choice)}, should be int"
+        if choice < 1 or choice > len(items):
+            click.secho(f"Invalid choice, must be 1-{len(items)}", fg="red", err=True)
+            choice = None
+
+    return items[choice - 1]
+
 
 def _search_trakt() -> Input:
     # prompt user to ask if they want to search for a
@@ -294,31 +332,13 @@ def _search_trakt() -> Input:
     if not results:
         raise click.ClickException("No results found")
 
-    choice: Optional[int] = None
-
-    print_urls = False
-    while choice is None:
+    def _display_items(show_urls: bool, items: List[TraktType]) -> None:
         click.echo("Results:")
-        for i, result in enumerate(results, 1):
-            click.echo(f"{i}: {_display_search_entry(result, print_url=print_urls)}")
+        for i, result in enumerate(items, 1):
+            click.echo(f"{i}: {_display_search_entry(result, print_url=show_urls)}")
 
-        choice = click.prompt(
-            f"Pick result - enter 1-{len(results)}, or q to quit, u to show URLs",
-            default="1",
-            value_proc=_handle_pick_result,
-        )
-        if choice is None:
-            continue
-        if choice == "u":
-            print_urls = not print_urls
-            choice = None
-            continue
-        assert isinstance(choice, int), f"Invalid choice type: {choice} {type(choice)}"
-        if choice < 1 or choice > len(results):
-            click.secho(f"Invalid choice, must be 1-{len(results)}", fg="red", err=True)
-            choice = None
+    result = _pick_item(_display_items, prompt_prefix="Pick result", items=results)
 
-    result = results[choice - 1]
     result._get()
     inp = _parse_url_to_input(f"https://trakt.tv/{result.ext}")
     if pressed == "I":
@@ -466,8 +486,9 @@ def _print_recent_history(
 @main.command(short_help="remove recent watched item")
 @click.option("-i/-a", "--interactive/--non-interactive", default=True, is_flag=True)
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation")
+@click.option("-u", "--urls", is_flag=True, default=False, help="print URLs for items")
 @click.argument("limit", type=int, default=10)
-def unwatch(interactive: bool, yes: bool, limit: int) -> None:
+def unwatch(interactive: bool, yes: bool, limit: int, urls: bool) -> None:
     """
     Remove the last watched item from your history
     """
@@ -477,27 +498,20 @@ def unwatch(interactive: bool, yes: bool, limit: int) -> None:
     picked: HistoryEntry = data[0]
     print_urls = False
     if interactive:
-        choice: Optional[int] = None
-        while choice is None:
-            _print_recent_history(data, include_id=True, print_url=print_urls)
-            choice = click.prompt(
-                "Pick item to remove, q to quit, u to show URLs",
-                default="1",
-                value_proc=_handle_pick_result,
-            )
-            if choice is None:
-                continue
-            if choice == "u":
-                print_urls = not print_urls
-                choice = None
-                continue
-            if choice < 1 or choice > len(data):
-                choice = None
-                click.secho(
-                    f"Invalid choice, must be 1-{len(data)}", fg="red", err=True
+
+        def _display_items(show_urls: bool, items: List[HistoryEntry]) -> None:
+            click.echo("Recent history:")
+            for i, entry in enumerate(items, 1):
+                click.echo(
+                    f"{i}: {_display_history_entry(entry, include_id=True, print_url=show_urls)}"
                 )
 
-        picked = data[choice - 1]
+        picked = _pick_item(
+            _display_items,
+            prompt_prefix="Pick item to remove",
+            items=data,
+            show_urls_default=urls,
+        )
 
     click.echo(
         f"Removing {_display_history_entry(picked, include_id=True, print_url=print_urls)}...",
@@ -557,8 +571,8 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
     Mark next episode in progress as watched
 
     \b
-    This shows the most recent episode of a show that you have watched,
-    lets you pick one, and then and marks the next episode as watched.
+    This shows the most recent episode of a show that you've watched,
+    lets you pick one, and then and marks the next episode as watched
     """
     from traktexport.export import _trakt_request
 
@@ -572,7 +586,7 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
     )
 
     if not data:
-        click.secho("No progress", fg="red", err=True)
+        click.secho("Didnt find any progress", fg="red", err=True)
         return
 
     from traktexport.dal import Episode, Show
@@ -598,37 +612,22 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
             if entry.watched_at > prog[entry.media_data.show.ids.trakt_id].watched_at:
                 prog[entry.media_data.show.ids.trakt_id] = entry
 
-    if not prog:
-        click.secho("Could not compute any progress", fg="red", err=True)
-        return
-
-    # sort by watched_at
+    # sort by most recently watched_at
     prog = dict(sorted(prog.items(), key=lambda x: x[1].watched_at, reverse=True))
 
-    picked: HistoryEntry | None = None
-    print_urls = urls
-    while picked is None:
-        for i, entry in enumerate(prog.values(), 1):
+    def _display_items(show_urls: bool, items: List[HistoryEntry]) -> None:
+        click.echo("Progress:")
+        for i, entry in enumerate(items, 1):
             click.echo(
-                f"{i}: {_display_history_entry(entry, include_id=True, print_url=print_urls)}"
+                f"{i}: {_display_history_entry(entry, include_id=True, print_url=show_urls)}"
             )
 
-        choice = click.prompt(
-            "Pick show, will mark the next episode as watched, q to quit, u to show URLs",
-            default="1",
-            value_proc=_handle_pick_result,
-        )
-
-        if choice is None:
-            continue
-        if choice == "u":
-            print_urls = not print_urls
-            continue
-        if choice < 1 or choice > len(prog):
-            click.secho(f"Invalid choice, must be 1-{len(prog)}", fg="red", err=True)
-            continue
-
-        picked = list(prog.values())[choice - 1]
+    picked = _pick_item(
+        _display_items,
+        prompt_prefix="Pick show, will mark the next episode as watched",
+        items=list(prog.values()),
+        show_urls_default=urls,
+    )
 
     assert isinstance(
         picked.media_data, Episode
@@ -651,11 +650,13 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
         return
 
     # get data from next_data and propmt the user to confirm
-    assert 'next_episode' in next_data, f"Invalid next_data: {next_data}"
-    next_ep = next_data['next_episode']
+    assert "next_episode" in next_data, f"Invalid next_data: {next_data}"
+    next_ep = next_data["next_episode"]
     assert isinstance(next_ep, dict), f"Invalid next_ep: {next_ep}"
 
-    next_show_slug = picked.media_data.ids.trakt_slug or picked.media_data.show.ids.trakt_slug
+    next_show_slug = (
+        picked.media_data.ids.trakt_slug or picked.media_data.show.ids.trakt_slug
+    )
     assert isinstance(next_show_slug, str), f"Invalid next_show_slug: {next_show_slug}"
     next_episode = next_ep.get("number")
     assert isinstance(next_episode, int), f"Invalid next_episode: {next_episode}"
