@@ -213,29 +213,29 @@ def _parse_datetime(
         return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
-def _display_search_entry(entry: Any, *, print_url: bool = False) -> str:
+def _display_search_entry(entry: Any, *, print_urls: bool = False) -> str:
     buf: str = ""
     if isinstance(entry, Movie):
         buf += f"Movie:\t{entry.title} ({entry.year})"
-        if print_url and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
+        if print_urls and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
             buf += f" | https://trakt.tv/movies/{entry.ids['ids']['slug']}"
-        elif print_url and entry.ext:
+        elif print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
     elif isinstance(entry, TVEpisode):
         buf += f"Episode:\t{entry.show} S{entry.season}E{entry.episode} - {entry.title}"
-        if print_url and entry.ext:
+        if print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
     elif isinstance(entry, TVShow):
         buf += f"Show:\t{entry.title} ({entry.year})"
-        if print_url and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
+        if print_urls and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
             buf += f" | https://trakt.tv/shows/{entry.ids['ids']['slug']}"
-        elif print_url and entry.ext:
+        elif print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
     elif isinstance(entry, Person):
         buf += f"Person:\t{entry.name}"
-        if print_url and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
+        if print_urls and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
             buf += f" | https://trakt.tv/people/{entry.ids['ids']['slug']}"
-        elif print_url and entry.ext:
+        elif print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
     else:
         raise ValueError(f"Invalid entry type: {type(entry)}")
@@ -335,7 +335,7 @@ def _search_trakt() -> Input:
     def _display_items(show_urls: bool, items: List[TraktType]) -> None:
         click.echo("Results:")
         for i, result in enumerate(items, 1):
-            click.echo(f"{i}: {_display_search_entry(result, print_url=show_urls)}")
+            click.echo(f"{i}: {_display_search_entry(result, print_urls=show_urls)}")
 
     result = _pick_item(_display_items, prompt_prefix="Pick result", items=results)
 
@@ -448,7 +448,7 @@ def _recent_history_entries(
 
 
 def _display_history_entry(
-    entry: HistoryEntry, include_id: bool = False, print_url: bool = False
+    entry: HistoryEntry, include_id: bool = False, print_urls: bool = False
 ) -> str:
     from traktexport.dal import Movie, Episode
 
@@ -456,13 +456,13 @@ def _display_history_entry(
     buf: str
     if isinstance(entry.media_data, Movie):
         buf = f"{watched_at} {entry.media_data.title}"
-        if print_url and entry.media_data.ids.trakt_slug:
+        if print_urls and entry.media_data.ids.trakt_slug:
             buf += f" | https://trakt.tv/movies/{entry.media_data.ids.trakt_slug}"
     elif isinstance(entry.media_data, Episode):
         ep = entry.media_data
         assert isinstance(ep, Episode)
         buf = f"{watched_at} {ep.show.title} S{ep.season}E{ep.episode} - {ep.title}"
-        if print_url and ep.show.ids.trakt_slug:
+        if print_urls and ep.show.ids.trakt_slug:
             buf += f" | https://trakt.tv/shows/{ep.show.ids.trakt_slug}/seasons/{ep.season}/episodes/{ep.episode}"
     else:
         raise ValueError(f"Invalid media_type: {entry.media_type}")
@@ -473,13 +473,13 @@ def _display_history_entry(
 
 
 def _print_recent_history(
-    history: Iterable[HistoryEntry], include_id: bool = False, print_url: bool = False
+    history: Iterable[HistoryEntry], include_id: bool = False, print_urls: bool = False
 ) -> None:
     history = list(history)  # consume so the request happens
     click.secho("Recent history:", bold=True)
     for i, entry in enumerate(history, 1):
         click.echo(
-            f"{i}: {_display_history_entry(entry, include_id=include_id, print_url=print_url)}"
+            f"{i}: {_display_history_entry(entry, include_id=include_id, print_urls=print_urls)}"
         )
 
 
@@ -503,7 +503,7 @@ def unwatch(interactive: bool, yes: bool, limit: int, urls: bool) -> None:
             click.echo("Recent history:")
             for i, entry in enumerate(items, 1):
                 click.echo(
-                    f"{i}: {_display_history_entry(entry, include_id=True, print_url=show_urls)}"
+                    f"{i}: {_display_history_entry(entry, include_id=True, print_urls=show_urls)}"
                 )
 
         picked = _pick_item(
@@ -514,7 +514,7 @@ def unwatch(interactive: bool, yes: bool, limit: int, urls: bool) -> None:
         )
 
     click.echo(
-        f"Removing {_display_history_entry(picked, include_id=True, print_url=print_urls)}...",
+        f"Removing {_display_history_entry(picked, include_id=True, print_urls=print_urls)}...",
         err=True,
     )
 
@@ -551,7 +551,7 @@ def recent(limit: int, urls: bool, history_type: Optional[HistoryType]) -> None:
     Show recent history
     """
     _print_recent_history(
-        _recent_history_entries(limit=limit, history_type=history_type), print_url=urls
+        _recent_history_entries(limit=limit, history_type=history_type), print_urls=urls
     )
 
 
@@ -619,7 +619,7 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
         click.echo("Progress:")
         for i, entry in enumerate(items, 1):
             click.echo(
-                f"{i}: {_display_history_entry(entry, include_id=True, print_url=show_urls)}"
+                f"{i}: {_display_history_entry(entry, include_id=True, print_urls=show_urls)}"
             )
 
     picked = _pick_item(
