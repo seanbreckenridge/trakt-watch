@@ -664,6 +664,11 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
     # get data from next_data and prompt the user to confirm
     assert "next_episode" in next_data, f"Invalid next_data: {next_data}"
     next_ep = next_data["next_episode"]
+    if next_ep is None:
+        click.secho(
+            f"No next episode found for {picked.media_data.show.title}", fg="red", err=True
+        )
+        return
     assert isinstance(next_ep, dict), f"Invalid next_ep: {next_ep}"
 
     next_show_slug = (
