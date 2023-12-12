@@ -3,6 +3,7 @@
 import json
 from typing import (
     get_args,
+    assert_never,
     TypeVar,
     List,
     Literal,
@@ -380,6 +381,8 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> None:
                 open_new_tab(url)
             case "none":
                 pass
+            case _:
+                assert_never(policy)
     else:
         click.secho("Cannot determine Letterboxd URL for entry", fg="red", err=True)
 
