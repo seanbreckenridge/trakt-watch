@@ -18,12 +18,11 @@ from datetime import datetime, timezone
 
 import click
 from logzero import logger  # type: ignore[import]
-from traktexport.export import _check_config
 
 from trakt.movies import Movie  # type: ignore[import]
 from trakt.tv import TVShow, TVEpisode  # type: ignore[import]
 from trakt.people import Person  # type: ignore[import]
-from trakt.sync import search  # type: ignore[import]
+from traktexport.export import _check_config
 
 _check_config()
 
@@ -326,6 +325,8 @@ def _search_trakt() -> Input:
         "A": None,
     }.get(pressed)
 
+    from trakt.sync import search  # type: ignore[import]
+
     search_term = click.prompt(f"Search for {media_type or 'all'}", type=str)
     results = search(search_term, search_type=media_type)  # type: ignore[arg-type]
 
@@ -357,7 +358,10 @@ def _handle_input(
         return _search_trakt()
 
 
-def _open_letterboxd(media: TraktType) -> None:
+LetterboxdChoice = Literal["prompt", "open", "none"]
+
+
+def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> None:
     from webbrowser import open_new_tab
 
     # dont try to open for people/episodes
@@ -368,7 +372,14 @@ def _open_letterboxd(media: TraktType) -> None:
 
     if media.ids.get("ids") and media.ids["ids"].get("tmdb"):
         url = f"https://letterboxd.com/tmdb/{media.ids['ids']['tmdb']}/"
-        open_new_tab(url)
+        match policy:
+            case "prompt":
+                if click.confirm(f"Open {url} in browser?", default=True):
+                    open_new_tab(url)
+            case "open":
+                open_new_tab(url)
+            case "none":
+                pass
     else:
         click.secho("Cannot determine Letterboxd URL for entry", fg="red", err=True)
 
@@ -404,22 +415,20 @@ def _open_letterboxd(media: TraktType) -> None:
     "--letterboxd",
     "letterboxd",
     help="open corresponding letterboxd.com entry in your browser",
-    is_flag=True,
-    default=False,
-    envvar="OPEN_LETTERBOXD",
+    type=click.Choice(list(get_args(LetterboxdChoice)), case_sensitive=False),
+    default="none",
 )
 def watch(
     inp: Input,
     at: Union[datetime, Literal["released"], None],
     rating: Optional[int],
-    letterboxd: bool,
+    letterboxd: LetterboxdChoice,
 ) -> None:
     """
     Mark an entry on trakt.tv as watched
     """
     media = _mark_watched(inp, watched_at=at, rating=rating)
-    if letterboxd:
-        _open_letterboxd(media)
+    _open_letterboxd(media, policy=letterboxd)
     _print_recent_history(_recent_history_entries(limit=10))
 
 
@@ -721,17 +730,15 @@ def _rate_input(input: Input, rating: int) -> TraktType:
     "--letterboxd",
     "letterboxd",
     help="open corresponding letterboxd.com entry in your browser",
-    is_flag=True,
-    default=False,
-    envvar="OPEN_LETTERBOXD",
+    type=click.Choice(list(get_args(LetterboxdChoice)), case_sensitive=False),
+    default="none",
 )
-def rate(inp: Input, rating: int, letterboxd: bool) -> None:
+def rate(inp: Input, rating: int, letterboxd: LetterboxdChoice) -> None:
     """
     Rate an entry on trakt.tv
     """
     media = _rate_input(inp, rating)
-    if letterboxd:
-        _open_letterboxd(media)
+    _open_letterboxd(media, policy=letterboxd)
 
 
 if __name__ == "__main__":
