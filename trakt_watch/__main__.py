@@ -362,14 +362,14 @@ def _handle_input(
 LetterboxdChoice = Literal["prompt", "open", "none"]
 
 
-def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> None:
+def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
     from webbrowser import open_new_tab
 
     # dont try to open for people/episodes
     # entire TV shows are sometimes on letterboxd if they dont have multiple
     # seasons, and movies obviously are on lb
     if not isinstance(media, (Movie, TVShow)):
-        return
+        return False
 
     if media.ids.get("ids") and media.ids["ids"].get("tmdb"):
         url = f"https://letterboxd.com/tmdb/{media.ids['ids']['tmdb']}/"
@@ -377,14 +377,19 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> None:
             case "prompt":
                 if click.confirm(f"Open {url} in browser?", default=True):
                     open_new_tab(url)
+                    return True
             case "open":
                 open_new_tab(url)
+                return True
             case "none":
                 pass
+                return False
             case _:
                 assert_never(policy)
+        return False
     else:
         click.secho("Cannot determine Letterboxd URL for entry", fg="red", err=True)
+        return False
 
 
 @main.command(short_help="mark movie/episode as watched")
@@ -666,7 +671,9 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
     next_ep = next_data["next_episode"]
     if next_ep is None:
         click.secho(
-            f"No next episode found for {picked.media_data.show.title}", fg="red", err=True
+            f"No next episode found for {picked.media_data.show.title}",
+            fg="red",
+            err=True,
         )
         return
     assert isinstance(next_ep, dict), f"Invalid next_ep: {next_ep}"
@@ -747,6 +754,23 @@ def rate(inp: Input, rating: int, letterboxd: LetterboxdChoice) -> None:
     """
     media = _rate_input(inp, rating)
     _open_letterboxd(media, policy=letterboxd)
+
+
+@main.command(short_help="open letterboxd.com entry")
+@click.option(
+    "--url",
+    "inp",
+    help="URL to rate",
+    default=None,
+    type=str,
+    callback=_handle_input,
+)
+def letterboxd(inp: Input) -> None:
+    """
+    Open corresponding letterboxd.com entry in your browser
+    """
+    if not _open_letterboxd(inp.trakt(), policy="open"):
+        click.secho("Could not open Letterboxd URL", fg="red", err=True)
 
 
 if __name__ == "__main__":
