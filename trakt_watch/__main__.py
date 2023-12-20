@@ -382,7 +382,6 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
                 open_new_tab(url)
                 return True
             case "none":
-                pass
                 return False
             case _:
                 assert_never(policy)
