@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import json
 from typing import (
     get_args,
@@ -362,9 +363,18 @@ def _handle_input(
 LetterboxdChoice = Literal["prompt", "open", "none"]
 
 
-def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
-    from webbrowser import open_new_tab
+def _open_url(url: str) -> None:
+    if URL_OPENER := os.environ.get("URL_OPENER"):
+        import subprocess
 
+        subprocess.Popen([URL_OPENER, url])
+    else:
+        from webbrowser import open_new_tab
+
+        open_new_tab(url)
+
+
+def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
     # dont try to open for people/episodes
     # entire TV shows are sometimes on letterboxd if they dont have multiple
     # seasons, and movies obviously are on lb
@@ -376,10 +386,10 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
         match policy:
             case "prompt":
                 if click.confirm(f"Open {url} in browser?", default=True):
-                    open_new_tab(url)
+                    _open_url(url)
                     return True
             case "open":
-                open_new_tab(url)
+                _open_url(url)
                 return True
             case "none":
                 return False
