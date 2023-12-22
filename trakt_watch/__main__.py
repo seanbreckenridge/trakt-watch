@@ -366,12 +366,20 @@ LetterboxdChoice = Literal["prompt", "open", "none"]
 def _open_url(url: str) -> None:
     if URL_OPENER := os.environ.get("URL_OPENER"):
         import subprocess
+        import shutil
 
-        subprocess.Popen([URL_OPENER, url])
-    else:
-        from webbrowser import open_new_tab
+        path = shutil.which(URL_OPENER)
+        if path is not None:
+            try:
+                subprocess.Popen([path, url])
+                return
+            except Exception as e:
+                click.echo(f"Failed to open URL with {URL_OPENER=}: {e}", err=True)
 
-        open_new_tab(url)
+    # fallback if no URL_OPENER is set
+    from webbrowser import open_new_tab
+
+    open_new_tab(url)
 
 
 def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
