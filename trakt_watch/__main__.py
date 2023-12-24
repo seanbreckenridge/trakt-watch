@@ -7,6 +7,7 @@ from typing import (
     assert_never,
     TypeVar,
     List,
+    Sequence,
     Literal,
     Callable,
     Optional,
@@ -600,7 +601,8 @@ def recent(limit: int, urls: bool, history_type: Optional[HistoryType]) -> None:
     callback=_parse_datetime,
     default=None,
 )
-def progress(urls: bool, specials: bool, at: datetime) -> None:
+@click.argument("LIMIT", type=int, nargs=-1)
+def progress(urls: bool, specials: bool, at: datetime, limit: Sequence[int]) -> None:
     """
     Mark next episode in progress as watched
 
@@ -646,9 +648,6 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
             if entry.watched_at > prog[entry.media_data.show.ids.trakt_id].watched_at:
                 prog[entry.media_data.show.ids.trakt_id] = entry
 
-    # sort by most recently watched_at
-    prog = dict(sorted(prog.items(), key=lambda x: x[1].watched_at, reverse=True))
-
     def _display_items(show_urls: bool, items: List[HistoryEntry]) -> None:
         click.echo("Progress:")
         for i, entry in enumerate(items, 1):
@@ -656,10 +655,17 @@ def progress(urls: bool, specials: bool, at: datetime) -> None:
                 f"{i}: {_display_history_entry(entry, include_id=True, print_urls=show_urls)}"
             )
 
+    # sort by most recently watched_at
+    prog = dict(sorted(prog.items(), key=lambda x: x[1].watched_at, reverse=True))
+
+    current_eps = list(prog.values())
+    if limit:
+        current_eps = current_eps[: limit[0]]
+
     picked = _pick_item(
         _display_items,
         prompt_prefix="Pick show, will mark the next episode as watched",
-        items=list(prog.values()),
+        items=current_eps,
         show_urls_default=urls,
     )
 
