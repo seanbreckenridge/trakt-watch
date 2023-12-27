@@ -361,7 +361,7 @@ def _handle_input(
         return _search_trakt()
 
 
-LetterboxdChoice = Literal["prompt", "open", "none"]
+LetterboxdPolicy = Literal["prompt", "open", "print", "none"]
 
 
 def _open_url(url: str) -> None:
@@ -372,7 +372,7 @@ def _open_url(url: str) -> None:
         path = shutil.which(URL_OPENER)
         if path is not None:
             try:
-                subprocess.Popen([path, url])
+                subprocess.run([path, url], check=True)
                 return
             except Exception as e:
                 click.echo(f"Failed to open URL with {URL_OPENER=}: {e}", err=True)
@@ -383,7 +383,7 @@ def _open_url(url: str) -> None:
     open_new_tab(url)
 
 
-def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
+def _open_letterboxd(media: TraktType, policy: LetterboxdPolicy) -> bool:
     # dont try to open for people/episodes
     # entire TV shows are sometimes on letterboxd if they dont have multiple
     # seasons, and movies obviously are on lb
@@ -399,6 +399,9 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
                     return True
             case "open":
                 _open_url(url)
+                return True
+            case "print":
+                click.echo(url)
                 return True
             case "none":
                 return False
@@ -441,14 +444,14 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdChoice) -> bool:
     "--letterboxd",
     "letterboxd",
     help="open corresponding letterboxd.com entry in your browser",
-    type=click.Choice(list(get_args(LetterboxdChoice)), case_sensitive=False),
+    type=click.Choice(list(get_args(LetterboxdPolicy)), case_sensitive=False),
     default="none",
 )
 def watch(
     inp: Input,
     at: Union[datetime, Literal["released"], None],
     rating: Optional[int],
-    letterboxd: LetterboxdChoice,
+    letterboxd: LetterboxdPolicy,
 ) -> None:
     """
     Mark an entry on trakt.tv as watched
@@ -768,10 +771,10 @@ def _rate_input(input: Input, rating: int) -> TraktType:
     "--letterboxd",
     "letterboxd",
     help="open corresponding letterboxd.com entry in your browser",
-    type=click.Choice(list(get_args(LetterboxdChoice)), case_sensitive=False),
+    type=click.Choice(list(get_args(LetterboxdPolicy)), case_sensitive=False),
     default="none",
 )
-def rate(inp: Input, rating: int, letterboxd: LetterboxdChoice) -> None:
+def rate(inp: Input, rating: int, letterboxd: LetterboxdPolicy) -> None:
     """
     Rate an entry on trakt.tv
     """
@@ -788,11 +791,19 @@ def rate(inp: Input, rating: int, letterboxd: LetterboxdChoice) -> None:
     type=str,
     callback=_handle_input,
 )
-def letterboxd(inp: Input) -> None:
+@click.option(
+    "-a",
+    "--action",
+    "policy",
+    help="how to open letterboxd.com entry",
+    type=click.Choice(list(get_args(LetterboxdPolicy)), case_sensitive=False),
+    default="open",
+)
+def letterboxd(inp: Input, policy: LetterboxdPolicy) -> None:
     """
     Open corresponding letterboxd.com entry in your browser
     """
-    if not _open_letterboxd(inp.trakt(), policy="open"):
+    if not _open_letterboxd(inp.trakt(), policy=policy):
         click.secho("Could not open Letterboxd URL", fg="red", err=True)
 
 
