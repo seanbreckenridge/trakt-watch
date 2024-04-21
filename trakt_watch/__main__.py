@@ -102,6 +102,8 @@ def _print_response_pretty(d: Any, rating: bool = False) -> bool:
                     click.echo(f"Movies: {d[key]['movies']}")
                 if d[key]["episodes"]:
                     click.echo(f"Episodes: {d[key]['episodes']}")
+            else:
+                click.secho("No items changed", bold=True, fg="red")
         else:
             return False
 
@@ -749,6 +751,34 @@ def _rate_input(input: Input, rating: int) -> TraktType:
         raise ValueError(f"Invalid input type: {type(input)}")
 
 
+def _unrate_input(input: Input) -> None:
+    data = {}
+    if isinstance(input, MovieId):
+        mv = input.trakt()
+        data["movies"] = [{"ids": mv.ids.get("ids", {})}]
+        assert data["movies"][0]["ids"], f"Invalid movie ids: {data['movies']} {mv.ids}"
+    elif isinstance(input, EpisodeId):
+        ep = input.trakt()
+        data["episodes"] = [{"ids": ep.ids.get("ids", {})}]
+        assert data["episodes"][0][
+            "ids"
+        ], f"Invalid episode ids: {data['episodes']} {ep.ids}"
+    elif isinstance(input, TVShowId):
+        tv = input.trakt()
+        data["shows"] = [{"ids": tv.ids.get("ids", {})}]
+        assert data["shows"][0]["ids"], f"Invalid show ids: {data['shows']} {tv.ids}"
+    else:
+        raise ValueError(f"Invalid input type: {type(input)}")
+
+    from traktexport.export import _trakt_request
+
+    resp = _trakt_request(
+        "sync/ratings/remove", data=data, logger=logger, method="post"
+    )
+
+    _print_response(resp, rating=True)
+
+
 @main.command(short_help="rate movie/tv show/episode")
 @click.option(
     "--url",
@@ -780,6 +810,22 @@ def rate(inp: Input, rating: int, letterboxd: LetterboxdPolicy) -> None:
     """
     media = _rate_input(inp, rating)
     _open_letterboxd(media, policy=letterboxd)
+
+
+@main.command(short_help="unrate movie/tv show/episode")
+@click.option(
+    "--url",
+    "inp",
+    help="URL to unrate",
+    default=None,
+    type=str,
+    callback=_handle_input,
+)
+def unrate(inp: Input) -> None:
+    """
+    Unrate an entry on trakt.tv
+    """
+    _unrate_input(inp)
 
 
 @main.command(short_help="open letterboxd.com entry")
