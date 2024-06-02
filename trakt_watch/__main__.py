@@ -525,7 +525,7 @@ def _print_recent_history(
 
 @main.command(short_help="remove recent watched item")
 @click.option("-i/-a", "--interactive/--non-interactive", default=True, is_flag=True)
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation")
+@click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation")
 @click.option("-u", "--urls", is_flag=True, default=False, help="print URLs for items")
 @click.argument("limit", type=int, default=10)
 def unwatch(interactive: bool, yes: bool, limit: int, urls: bool) -> None:
@@ -598,6 +598,7 @@ def recent(limit: int, urls: bool, history_type: Optional[HistoryType]) -> None:
 @main.command(short_help="mark next episode in progress")
 @click.option("-u", "--urls", is_flag=True, default=False, help="print URLs for items")
 @click.option("-s", "--specials", is_flag=True, default=False, help="include specials")
+@click.option("-y", "--yes", is_flag=True, default=False, help="Skip confirmation")
 @click.option(
     "-a",
     "--at",
@@ -607,7 +608,9 @@ def recent(limit: int, urls: bool, history_type: Optional[HistoryType]) -> None:
     default=None,
 )
 @click.argument("LIMIT", type=int, nargs=-1)
-def progress(urls: bool, specials: bool, at: datetime, limit: Sequence[int]) -> None:
+def progress(
+    urls: bool, yes: bool, specials: bool, at: datetime, limit: Sequence[int]
+) -> None:
     """
     Mark next episode in progress as watched
 
@@ -721,7 +724,7 @@ def progress(urls: bool, specials: bool, at: datetime, limit: Sequence[int]) -> 
 
     next_ep_str = f"{next_episode_title} (S{next_season}E{next_episode})"
 
-    if not click.confirm(
+    if not yes and not click.confirm(
         f"Mark '{next_ep_str}' from '{picked.media_data.show.title}' as watched?",
         default=True,
     ):
