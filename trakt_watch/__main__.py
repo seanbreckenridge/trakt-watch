@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import os
 import json
 from typing import (
@@ -358,6 +359,9 @@ def _handle_input(
     ctx: click.Context, param: click.Argument, url: Optional[str]
 ) -> Input:
     if url is not None:
+        if not url.strip():
+            click.secho("No URL passed", err=True, fg="red")
+            sys.exit(1)
         return _parse_url_to_input(url)
     else:
         return _search_trakt()
