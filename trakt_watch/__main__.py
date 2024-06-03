@@ -213,7 +213,7 @@ def _parse_datetime(
 
 
 def _display_search_entry(entry: Any, *, print_urls: bool = False) -> str:
-    from trakt.people import TraktPerson  # type: ignore[import]
+    from trakt.people import Person as TraktPerson  # type: ignore[import]
 
     buf: str = ""
     if isinstance(entry, TraktMovie):
