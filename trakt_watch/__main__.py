@@ -23,12 +23,8 @@ from datetime import datetime, timezone
 import click
 from logzero import logger  # type: ignore[import]
 
-from trakt.movies import Movie  # type: ignore[import]
-from trakt.tv import TVShow, TVEpisode  # type: ignore[import]
-from trakt.people import Person  # type: ignore[import]
-from traktexport.export import _check_config
-
-_check_config()
+from trakt.movies import Movie as TraktMovie  # type: ignore[import]
+from trakt.tv import TVShow as TraktTVShow, TVEpisode as TraktTVEpisode  # type: ignore[import]
 
 USERNAME: Optional[str] = None
 
@@ -46,17 +42,17 @@ USERNAME: Optional[str] = None
 )
 def main(username: str) -> None:
     global USERNAME
+    from traktexport.export import _check_config
 
     USERNAME = username
+    _check_config()
 
 
 class MovieId(NamedTuple):
     id: str
 
-    def trakt(self) -> Movie:
-        from trakt.movies import Movie
-
-        mv = Movie(self.id, year=None, slug=self.id)
+    def trakt(self) -> TraktMovie:
+        mv = TraktMovie(self.id, year=None, slug=self.id)
         mv._get()
         return mv
 
@@ -66,7 +62,7 @@ class EpisodeId(NamedTuple):
     season: int
     episode: int
 
-    def trakt(self) -> TVEpisode:
+    def trakt(self) -> TraktTVEpisode:
         from trakt.tv import TVEpisode
 
         ep = TVEpisode(show=self.id, season=self.season, number=self.episode)
@@ -77,10 +73,8 @@ class EpisodeId(NamedTuple):
 class TVShowId(NamedTuple):
     id: str
 
-    def trakt(self) -> TVShow:
-        from trakt.tv import TVShow
-
-        tv = TVShow(self.id)
+    def trakt(self) -> TraktTVShow:
+        tv = TraktTVShow(self.id)
         tv._get()
         return tv
 
@@ -161,7 +155,7 @@ def _parse_url_to_input(url: str) -> Input:
             raise ValueError(f"Invalid URL parts: {prts}")
 
 
-TraktType = Union[Movie, TVEpisode, TVShow]
+TraktType = Union[TraktMovie, TraktTVEpisode, TraktTVShow]
 
 
 def _mark_watched(
@@ -219,24 +213,26 @@ def _parse_datetime(
 
 
 def _display_search_entry(entry: Any, *, print_urls: bool = False) -> str:
+    from trakt.people import TraktPerson  # type: ignore[import]
+
     buf: str = ""
-    if isinstance(entry, Movie):
+    if isinstance(entry, TraktMovie):
         buf += f"Movie:\t{entry.title} ({entry.year})"
         if print_urls and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
             buf += f" | https://trakt.tv/movies/{entry.ids['ids']['slug']}"
         elif print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
-    elif isinstance(entry, TVEpisode):
+    elif isinstance(entry, TraktTVEpisode):
         buf += f"Episode:\t{entry.show} S{entry.season}E{entry.episode} - {entry.title}"
         if print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
-    elif isinstance(entry, TVShow):
+    elif isinstance(entry, TraktTVShow):
         buf += f"Show:\t{entry.title} ({entry.year})"
         if print_urls and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
             buf += f" | https://trakt.tv/shows/{entry.ids['ids']['slug']}"
         elif print_urls and entry.ext:
             buf += f" | https://trakt.tv/{entry.ext}"
-    elif isinstance(entry, Person):
+    elif isinstance(entry, TraktPerson):
         buf += f"Person:\t{entry.name}"
         if print_urls and entry.ids.get("ids") and entry.ids["ids"].get("slug"):
             buf += f" | https://trakt.tv/people/{entry.ids['ids']['slug']}"
@@ -393,7 +389,7 @@ def _open_letterboxd(media: TraktType, policy: LetterboxdPolicy) -> bool:
     # dont try to open for people/episodes
     # entire TV shows are sometimes on letterboxd if they dont have multiple
     # seasons, and movies obviously are on lb
-    if not isinstance(media, (Movie, TVShow)):
+    if not isinstance(media, (TraktMovie, TraktTVShow)):
         return False
 
     if media.ids.get("ids") and media.ids["ids"].get("tmdb"):
