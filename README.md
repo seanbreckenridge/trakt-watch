@@ -116,6 +116,16 @@ Episode: 8
 
 The `progress` command works similarly to `watch`, but it presents you with a list of recently watched episodes, querying trakt for the 'next episode' like on the progress page on the trakt website.
 
+### letterboxd
+
+The `letterboxd` command can be used to search for a trakt entry, and then open the corresponding letterboxd URL using the TMDB ID. This is useful since letterboxd doesn't have an API, so we can use trakt's as a stand-in. I put this shell function in my shell startup:
+
+```bash
+lb () {
+        trakt-watch letterboxd --action open "$@"
+}
+```
+
 ### Tests
 
 ```bash
